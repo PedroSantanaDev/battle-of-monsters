@@ -1,6 +1,8 @@
-using System.Diagnostics;
+﻿using System.Globalization;
 using API.Controllers;
+using API.Models;
 using API.Test.Fixtures;
+using CsvHelper;
 using FluentAssertions;
 using Lib.Repository.Entities;
 using Lib.Repository.Repository;
@@ -18,7 +20,7 @@ public class MonsterControllerTests
     {
         this._repository = new Mock<IBattleOfMonstersRepository>();
     }
-    
+
     [Fact]
     public async Task Get_OnSuccess_ReturnsListOfMonsters()
     {
@@ -28,10 +30,10 @@ public class MonsterControllerTests
             .Setup(x => x.Monsters.GetAllAsync())
             .ReturnsAsync(monsters);
 
-        MonsterController sut = new MonsterController();
+        MonsterController sut = new MonsterController(this._repository.Object);
 
         ActionResult result = await sut.GetAll();
-        OkObjectResult objectResults = (OkObjectResult) result;
+        OkObjectResult objectResults = (OkObjectResult)result;
         objectResults?.Value.Should().BeOfType<Monster[]>();
     }
 
@@ -46,7 +48,7 @@ public class MonsterControllerTests
             .Setup(x => x.Monsters.FindAsync(id))
             .ReturnsAsync(monster);
 
-        MonsterController sut = new MonsterController();
+        MonsterController sut = new MonsterController(this._repository.Object);
 
         ActionResult result = await sut.Find(id);
         OkObjectResult objectResults = (OkObjectResult)result;
@@ -62,7 +64,7 @@ public class MonsterControllerTests
             .Setup(x => x.Monsters.FindAsync(id))
             .ReturnsAsync(() => null);
 
-        MonsterController sut = new MonsterController();
+        MonsterController sut = new MonsterController(this._repository.Object);
 
         ActionResult result = await sut.Find(id);
         NotFoundObjectResult objectResults = (NotFoundObjectResult)result;
@@ -86,7 +88,7 @@ public class MonsterControllerTests
         this._repository
             .Setup(x => x.Monsters.AddAsync(m));
 
-        MonsterController sut = new MonsterController();
+        MonsterController sut = new MonsterController(this._repository.Object);
 
         ActionResult result = await sut.Add(m);
         OkObjectResult objectResults = (OkObjectResult)result;
@@ -111,7 +113,7 @@ public class MonsterControllerTests
         this._repository
            .Setup(x => x.Monsters.Update(id, m));
 
-        MonsterController sut = new MonsterController();
+        MonsterController sut = new MonsterController(this._repository.Object);
 
         ActionResult result = await sut.Update(id, m);
         OkResult objectResults = (OkResult)result;
@@ -135,7 +137,7 @@ public class MonsterControllerTests
         this._repository
            .Setup(x => x.Monsters.Update(id, m));
 
-        MonsterController sut = new MonsterController();
+        MonsterController sut = new MonsterController(this._repository.Object);
 
         ActionResult result = await sut.Update(id, m);
         NotFoundObjectResult objectResults = (NotFoundObjectResult)result;
@@ -157,7 +159,7 @@ public class MonsterControllerTests
         this._repository
            .Setup(x => x.Monsters.RemoveAsync(id));
 
-        MonsterController sut = new MonsterController();
+        MonsterController sut = new MonsterController(this._repository.Object);
 
         ActionResult result = await sut.Remove(id);
         OkResult objectResults = (OkResult)result;
@@ -176,7 +178,7 @@ public class MonsterControllerTests
         this._repository
            .Setup(x => x.Monsters.RemoveAsync(id));
 
-        MonsterController sut = new MonsterController();
+        MonsterController sut = new MonsterController(this._repository.Object);
 
         ActionResult result = await sut.Remove(id);
         NotFoundObjectResult objectResults = (NotFoundObjectResult)result;
@@ -187,7 +189,41 @@ public class MonsterControllerTests
     [Fact]
     public async Task Post_OnSuccess_ImportCsvToMonster()
     {
-        // @TODO missing implementation
+        MonsterController sut = new MonsterController(this._repository.Object);
+
+        var pathToFile = Path.Combine(Environment.CurrentDirectory, "Files\\monsters-correct.csv");
+
+        using var stream = File.OpenRead(pathToFile);
+
+        var file = new FormFile(stream, 0, stream.Length, null, Path.GetFileName(stream.Name))
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "application/csv"
+        };
+
+
+        using (var reader = new StreamReader(pathToFile))
+        {
+            using var csv = new CsvReader(reader, CultureInfo.InvariantCulture);
+
+            var records = csv.GetRecords<MonsterToImport>().ToList();
+            var monsters = records.Select(x => new Monster()
+            {
+                Name = x.name,
+                Attack = x.attack,
+                Defense = x.defense,
+                Speed = x.speed,
+                Hp = x.hp,
+                ImageUrl = x.imageUrl
+            });
+
+            this._repository
+             .Setup(x => x.Monsters.AddAsync(monsters));
+        }
+
+        ActionResult result = await sut.ImportCsv(file);
+        OkResult objectResults = (OkResult)result;
+        objectResults.StatusCode.Should().Be(200);
     }
 
 }

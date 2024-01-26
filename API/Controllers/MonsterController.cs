@@ -11,11 +11,17 @@ public class MonsterController : BaseApiController
 {
     private readonly IBattleOfMonstersRepository _repository;
 
+    public MonsterController(IBattleOfMonstersRepository repository)
+    {
+        _repository = repository;
+    }
+
     [HttpGet]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<ActionResult> GetAll()
     {
-        return Ok();
+        var monsters = await _repository.Monsters.GetAllAsync();
+        return Ok(monsters);
     }
 
     [HttpGet("{id:int}")]
@@ -23,6 +29,11 @@ public class MonsterController : BaseApiController
     public async Task<ActionResult> Find(int id)
     {
         var monster = await _repository.Monsters.FindAsync(id);
+
+        if (monster == null)
+        {
+            return NotFound($"The monster with ID = {id} not found.");
+        }
         return Ok(monster);
     }
 
@@ -37,8 +48,14 @@ public class MonsterController : BaseApiController
 
     [HttpPut("{id:int}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult> Update(int id, [FromBody] Monster monster)
     {
+        var m = await _repository.Monsters.FindAsync(id);
+        if (m == null)
+        {
+            return NotFound($"The monster with ID = {id} not found.");
+        }
         _repository.Monsters.Update(id, monster);
         await _repository.Save();
         return Ok();
@@ -48,7 +65,15 @@ public class MonsterController : BaseApiController
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<ActionResult> Remove(int id)
     {
+        var monster = await _repository.Monsters.FindAsync(id);
+
+        if (monster == null)
+        {
+            return NotFound($"The monster with ID = {id} not found.");
+        }
+
         await _repository.Monsters.RemoveAsync(id);
+
         await _repository.Save();
         return Ok();
     }
@@ -64,7 +89,7 @@ public class MonsterController : BaseApiController
             string filename = Guid.NewGuid().ToString() + ext;
             string directory = Path.Combine(Directory.GetCurrentDirectory(), "Temp");
             string filepath = Path.Combine(directory, filename);
-            
+
             if (!Directory.Exists(directory))
             {
                 Directory.CreateDirectory(directory);
@@ -99,16 +124,16 @@ public class MonsterController : BaseApiController
 
                         await _repository.Monsters.AddAsync(monsters);
                         await _repository.Save();
-
-                        System.IO.File.Delete(filepath);
-                        return Ok();
                     }
                     catch (Exception)
                     {
                         System.IO.File.Delete(filepath);
                         return BadRequest("Wrong data mapping.");
                     }
-                }   
+                }
+
+                System.IO.File.Delete(filepath);
+                return Ok();
             }
         }
         catch (Exception)

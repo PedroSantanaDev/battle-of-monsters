@@ -28,4 +28,10 @@
       <ProjectReference Include="..\Lib.Repository\Lib.Repository.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+      <None Update="Files\monsters-correct.csv">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </None>
+    </ItemGroup>
+
 </Project>
